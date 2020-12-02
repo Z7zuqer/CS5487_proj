@@ -13,4 +13,4 @@ def get_dataset_cifar100(download=True):
         train=False,
         download=download
     )
-    return [cifar10, cifar10_test]
+    return [cifar100, cifar100_test]
