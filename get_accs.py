@@ -1,48 +1,24 @@
 import os
 import argparse
 
-def main():
-    parser = argparse.ArgumentParser(description='CS5487_proj')
-    parser.add_argument('--method', type=str,
-                        default='svm',
-                        help='Name of the Method[bdr, logistics, svm]')
-    parser.add_argument('--dataset', type=str,
-                        default='mnist',
-                        help='Name of the Dataset[cifar10, cifar100, mnist]')
-    parser.add_argument('--print_freq', type=int,
-                        default=200,
-                        help='Name of the Dataset[cifar10, cifar100, minist]')
-    parser.add_argument('--lr', type=float,
-                        default=1e-1,
-                        help='learning rate')
-    parser.add_argument('--momentum', type=float,
-                        default=0.9,
-                        help='momentum')
-    parser.add_argument('--epoch', type=int,
-                        default=20,
-                        help='epoch')
-    parser.add_argument('--bs', type=int,
-                        default=32,
-                        help='epoch')
-    parser.add_argument('--shuffle', type=int,
-                        default=1,
-                        help='epoch')
-    args = parser.parse_args()
-
+def get_acc(method, dataset, print_freq, lr, momentum, epoch, bs, shuffle, init):
+    save_dir = "{}_{}_{}".format(method, dataset, str(lr).replace('.', '_'))
+    if not os.path.exists(save_dir):
+        os.mkdir(save_dir)
     channels = 3
-    if args.dataset.lower() == 'cifar10':
+    if dataset.lower() == 'cifar10':
         from datasets.cifar10 import get_dataset_cifar10
-        train_loader, test_loader = get_dataset_cifar10(args.bs, (args.shuffle==1))
+        train_loader, test_loader = get_dataset_cifar10(bs, (shuffle==1))
         input_num = 32 * 32
         class_num = 10
-    elif args.dataset.lower() == 'cifar100':
+    elif dataset.lower() == 'cifar100':
         from datasets.cifar100 import get_dataset_cifar100
-        train_loader, test_loader = get_dataset_cifar100(args.bs, (args.shuffle==1))
+        train_loader, test_loader = get_dataset_cifar100(bs, (shuffle==1))
         input_num = 32 * 32
         class_num = 100
-    elif args.dataset.lower() == 'mnist':
+    elif dataset.lower() == 'mnist':
         from datasets.mnist import get_dataset_mnist
-        train_loader, test_loader = get_dataset_mnist(args.bs, (args.shuffle==1))
+        train_loader, test_loader = get_dataset_mnist(bs, (shuffle==1))
         input_num = 28 * 28
         class_num = 10
         channels = 1
@@ -50,21 +26,28 @@ def main():
         raise ValueError('Dataset Not Supported!')
 
     model = None
-    if args.method.lower() == 'bdr':
+    if method.lower() == 'bdr':
         pass
-    elif args.method.lower() == 'logistics':
+    elif method.lower() == 'logistics':
+        max_acc = 0
         from methods.Logistics import Logistics
-        model = Logistics(input_num, class_num, args.lr, channels=channels)
+        model = Logistics(input_num, class_num, lr, channels=channels, init=init)
 
-        for epoch in range(args.epoch):
+        for epoch in range(epoch):
             loss_sum, loss_cnt = 0., 0
+
+            epoch_save_dir = os.path.join(save_dir, "{:03d}".format(epoch))
+            if not os.path.exists(epoch_save_dir):
+                os.mkdir(epoch_save_dir)
+
             for idx, data in enumerate(train_loader):
                 x, y = data[0], data[1]
                 loss = model(x, y)
                 loss_sum += loss * x.shape[0]
                 loss_cnt += x.shape[0]
 
-                if idx % args.print_freq == 0:
+                if idx % print_freq == 0:
+
                     print('[Epoch {}] Iters: {}/{} Loss: {}'.format(epoch, idx, len(train_loader), loss_sum / loss_cnt))
 
             acc_sum, acc_cnt = 0., 0
@@ -76,20 +59,21 @@ def main():
                 acc_cnt += x.shape[0]
 
             print('[Epoch {}] Acc: {}'.format(epoch, acc_sum / acc_cnt))
+            max_acc = max(max_acc, acc_sum / acc_cnt)
 
-    elif args.method.lower() == 'svm':
+    elif method.lower() == 'svm':
+        max_acc = 0
         import torch
         from methods.SVM import SVM_SVC, SVM_Loss
 
         train_cri = SVM_Loss()
         model = SVM_SVC(input_num, class_num, channels)
-        optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
+        optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=momentum)
 
-        for epoch in range(args.epoch):
+        for epoch in range(epoch):
             loss_sum, loss_cnt = 0., 0
 
             for idx, data in enumerate(train_loader):
-                break
                 x, y = data[0], data[1].float()
 
                 loss = train_cri(model(x), y)
@@ -101,7 +85,7 @@ def main():
                 loss_sum += loss * x.shape[0]
                 loss_cnt += x.shape[0]
 
-                if idx % args.print_freq == 0:
+                if idx % print_freq == 0:
                     print('[Epoch {}] Iters: {}/{} Loss: {}'.format(epoch, idx, len(train_loader), loss_sum / loss_cnt))
 
             acc_sum, acc_cnt = 0., 0
@@ -116,10 +100,22 @@ def main():
                 acc_sum += (predicted.view(-1).long() == y).sum()
 
             print('[Epoch {}] Acc: {}'.format(epoch, acc_sum / acc_cnt))
-
+            max_acc = max(max_acc, acc_sum / acc_cnt)
     else:
         raise ValueError('Method Not Supported!')
 
+    return max_acc
 
 if __name__ == '__main__':
-    main()
+    epoch = 3
+    svm_accs = []
+    print_freq = 50
+    lr = 0.01
+    momentum = 0.9
+    bs = 64
+    shuffle = True
+    init = 'zeros'
+    dataset = ['cifar10', 'cifar100', 'mnist']
+
+    acc = [get_acc('logistics', dataset_item, print_freq, lr, momentum, epoch, bs, shuffle, init) for dataset_item in dataset]
+    print(acc)

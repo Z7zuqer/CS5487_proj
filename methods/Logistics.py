@@ -2,11 +2,19 @@ import os
 import numpy as np
 
 class Logistics(object):
-    def __init__(self, input_num, class_num, lr, channels=3):
+    def __init__(self, input_num, class_num, lr, channels=3, init='ones'):
         self.class_num = class_num
         self.input_num = input_num * channels
-        self.weights = np.ones((input_num * channels, class_num))
         self.lr = lr
+
+        if init == 'ones':
+            self.weights = np.ones((input_num * channels, class_num))
+        elif init == 'zeros':
+            self.weights = np.ones((input_num * channels, class_num))
+        elif init == 'random':
+            self.weights = np.random.random((input_num * channels, class_num))
+        elif init == 'gaussian':
+            self.weights = np.random.randn(input_num * channels, class_num)
 
     def __call__(self, inputx, label):
         inputx = np.mat(inputx.reshape(-1, self.input_num).numpy())
