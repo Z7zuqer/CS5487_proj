@@ -1,4 +1,5 @@
 import os
+import time
 import argparse
 
 def get_acc(method, dataset, print_freq, lr, momentum, epoch, bs, shuffle, init):
@@ -35,6 +36,7 @@ def get_acc(method, dataset, print_freq, lr, momentum, epoch, bs, shuffle, init)
 
         for epoch in range(epoch):
             loss_sum, loss_cnt = 0., 0
+            sta_time = time.time()
 
             epoch_save_dir = os.path.join(save_dir, "{:03d}".format(epoch))
             if not os.path.exists(epoch_save_dir):
@@ -47,9 +49,12 @@ def get_acc(method, dataset, print_freq, lr, momentum, epoch, bs, shuffle, init)
                 loss_cnt += x.shape[0]
 
                 if idx % print_freq == 0:
-
                     print('[Epoch {}] Iters: {}/{} Loss: {}'.format(epoch, idx, len(train_loader), loss_sum / loss_cnt))
 
+            end_time = time.time()
+            print('Logis Epoch Train Time {}'.format((end_time - sta_time) / len(train_loader)))
+
+            sta_time = time.time()
             acc_sum, acc_cnt = 0., 0
             for idx, data in enumerate(test_loader):
                 x, y = data[0], data[1]
@@ -58,8 +63,19 @@ def get_acc(method, dataset, print_freq, lr, momentum, epoch, bs, shuffle, init)
                 acc_sum += acc * x.shape[0]
                 acc_cnt += x.shape[0]
 
+            end_time = time.time()
+            print('Logis Epoch Test Time {}'.format((end_time - sta_time) / len(test_loader)))
+
             print('[Epoch {}] Acc: {}'.format(epoch, acc_sum / acc_cnt))
             max_acc = max(max_acc, acc_sum / acc_cnt)
+
+        weights = (model.weights + 1) * 255
+        weights[weights > 255] = 255
+        weights[weights < 0] = 0
+        weights = weights.transpose(1, 0)
+
+        from visual_utils import visual_weights
+        visual_weights(weights, './outputs', 'logis', channels=channels)
 
     elif method.lower() == 'svm':
         max_acc = 0
@@ -72,6 +88,7 @@ def get_acc(method, dataset, print_freq, lr, momentum, epoch, bs, shuffle, init)
 
         for epoch in range(epoch):
             loss_sum, loss_cnt = 0., 0
+            sta_time = time.time()
 
             for idx, data in enumerate(train_loader):
                 x, y = data[0], data[1].float()
@@ -88,6 +105,10 @@ def get_acc(method, dataset, print_freq, lr, momentum, epoch, bs, shuffle, init)
                 if idx % print_freq == 0:
                     print('[Epoch {}] Iters: {}/{} Loss: {}'.format(epoch, idx, len(train_loader), loss_sum / loss_cnt))
 
+            end_time = time.time()
+            print('Logis Epoch Using {}'.format((end_time - sta_time) / len(train_loader)))
+
+            sta_time = time.time()
             acc_sum, acc_cnt = 0., 0
             for idx, data in enumerate(test_loader):
                 x, y = data[0].reshape(-1, model.input_num), data[1]
@@ -98,6 +119,9 @@ def get_acc(method, dataset, print_freq, lr, momentum, epoch, bs, shuffle, init)
 
                 acc_cnt += N
                 acc_sum += (predicted.view(-1).long() == y).sum()
+
+            end_time = time.time()
+            print('Logis Epoch Test Time {}'.format((end_time - sta_time) / len(test_loader)))
 
             print('[Epoch {}] Acc: {}'.format(epoch, acc_sum / acc_cnt))
             max_acc = max(max_acc, acc_sum / acc_cnt)
@@ -115,7 +139,7 @@ if __name__ == '__main__':
     bs = 64
     shuffle = True
     init = 'zeros'
-    dataset = ['cifar10', 'cifar100', 'mnist']
+    dataset = ['cifar10'] # , 'cifar100', 'mnist']
 
     acc = [get_acc('logistics', dataset_item, print_freq, lr, momentum, epoch, bs, shuffle, init) for dataset_item in dataset]
     print(acc)
